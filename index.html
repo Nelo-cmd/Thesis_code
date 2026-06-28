@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wellbore Carbonate-Scale Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0f1a; --bg2:#0d1320; --panel:#111a2b; --panel2:#17213400; --card:#16203200;
+    --line:#243149; --line2:#1b2438; --txt:#eaf0f8; --muted:#8ea0b6; --dim:#5f6f86;
+    --accent:#2dd4bf; --accent2:#38bdf8; --val:#fbbf24; --red:#f0556b; --green:#34d399;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box;margin:0}
+  #wbapp{font-family:'Inter',-apple-system,Segoe UI,Roboto,sans-serif;color:var(--txt);
+    background:linear-gradient(180deg,#0b1322,#080d16);border:1px solid var(--line);
+    border-radius:16px;overflow:hidden;box-shadow:var(--shadow);width:100%}
+  /* header */
+  #wbhead{display:flex;align-items:center;justify-content:space-between;gap:16px;
+    padding:16px 22px;border-bottom:1px solid var(--line);
+    background:linear-gradient(90deg,rgba(45,212,191,.07),rgba(56,189,248,.04) 60%,transparent)}
+  #wbhead .ttl{font-size:18px;font-weight:700;letter-spacing:-.01em}
+  #wbhead .sub{font-size:12px;color:var(--muted);margin-top:2px;font-weight:400}
+  .badges{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .badge{font-size:11px;font-weight:600;padding:5px 10px;border-radius:999px;border:1px solid var(--line);
+    background:var(--panel);color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap}
+  .badge .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+  .badge.ok{color:var(--accent);border-color:rgba(45,212,191,.35);background:rgba(45,212,191,.08)}
+  /* body grid */
+  #wbbody{display:grid;grid-template-columns:264px minmax(360px,1fr) 320px;grid-template-rows:560px}
+  .col{height:560px;overflow-y:auto}
+  #wbctl{padding:18px 18px 22px;border-right:1px solid var(--line);background:var(--bg2)}
+  #wbstage{position:relative;background:
+    radial-gradient(80% 60% at 50% 22%,#172238 0%,#0c1322 55%,#080d16 100%)}
+  #wbpanel{padding:18px;border-left:1px solid var(--line);background:var(--bg2)}
+  #wbcanvas{width:100%;height:560px;display:block}
+  /* controls */
+  .grp{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);
+    margin:4px 0 14px;display:flex;align-items:center;gap:8px}
+  .grp::after{content:"";flex:1;height:1px;background:var(--line2)}
+  .grp.mt{margin-top:24px}
+  .ctl{margin-bottom:15px}
+  .ctl .row{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;margin-bottom:7px;color:var(--muted)}
+  .ctl .row .v{font-weight:700;color:var(--val);font-variant-numeric:tabular-nums;font-size:13px}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:3px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#eaf0f8;border:3px solid var(--accent);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+  input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#eaf0f8;border:3px solid var(--accent);cursor:pointer}
+  .note{font-size:10.5px;color:var(--dim);line-height:1.6;margin-top:18px;padding-top:14px;border-top:1px solid var(--line2)}
+  /* panel */
+  .ph{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+  .seg{display:flex;gap:0;margin-bottom:20px;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
+  .seg button{flex:1;padding:9px 0;font-size:11.5px;font-weight:600;border:0;background:transparent;
+    color:var(--muted);cursor:pointer;font-family:inherit;transition:.15s}
+  .seg button.on{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#06121a}
+  .reads{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:18px}
+  .rc{background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:10px 11px}
+  .rc .k{font-size:10.5px;color:var(--muted);margin-bottom:3px}
+  .rc .val{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+  .rc .val small{font-size:11px;color:var(--muted);font-weight:500;margin-left:2px}
+  .verdict{display:flex;align-items:center;gap:9px;padding:11px 13px;border-radius:10px;margin-bottom:18px;
+    font-size:13px;font-weight:600;border:1px solid var(--line2)}
+  .verdict .ico{width:9px;height:9px;border-radius:50%}
+  canvas#wbplot{width:100%;background:var(--panel);border:1px solid var(--line2);border-radius:10px;display:block}
+  /* legend */
+  #wbleg{position:absolute;left:16px;top:16px;background:rgba(8,13,22,.82);backdrop-filter:blur(6px);
+    padding:11px 13px;border-radius:11px;border:1px solid var(--line);font-size:11px;min-width:172px}
+  #wbleg .lt{font-weight:600;margin-bottom:7px;color:var(--txt)}
+  #wbleg .bar{height:10px;border-radius:4px;margin-bottom:5px}
+  #wbleg .ticks{display:flex;justify-content:space-between;color:var(--muted);font-variant-numeric:tabular-nums}
+  #wbhint{position:absolute;right:16px;bottom:14px;font-size:10.5px;color:var(--dim);background:rgba(8,13,22,.7);
+    padding:5px 10px;border-radius:8px;border:1px solid var(--line2)}
+  #wbfoot{padding:11px 22px;border-top:1px solid var(--line);font-size:10.5px;color:var(--dim);
+    display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  #wbfoot a{color:var(--accent2);text-decoration:none}
+  @media (max-width:920px){
+    #wbbody{grid-template-columns:1fr;grid-template-rows:auto 420px auto}
+    .col{height:auto;max-height:none}
+    #wbctl{border-right:0;border-bottom:1px solid var(--line)}
+    #wbpanel{border-left:0;border-top:1px solid var(--line)}
+    #wbstage{height:420px}#wbcanvas{height:420px}
+  }
+</style>
+</head>
+<body>
+<div id="wbapp">
+  <div id="wbhead">
+    <div>
+      <div class="ttl">Wellbore Carbonate-Scale Explorer</div>
+      <div class="sub">Physics-informed downhole CaCO&#8323; scaling simulator &mdash; saturation index &amp; deposition kinetics</div>
+    </div>
+    <div class="badges">
+      <div class="badge ok"><span class="dot"></span>PHREEQC-validated&nbsp;&middot;&nbsp;r = 0.997</div>
+      <div class="badge">live model</div>
+    </div>
+  </div>
+
+  <div id="wbbody">
+    <div class="col" id="wbctl">
+      <div class="grp">Brine chemistry</div>
+      <div id="grp-chem"></div>
+      <div class="grp mt">Well conditions</div>
+      <div id="grp-well"></div>
+      <div class="note">Colour encodes scaling tendency down the well; the inner deposit shows where calcite accumulates. The live model uses a Davies activity correction for speed; the validated offline engine uses full Pitzer/HMW84 (matched to PHREEQC, r&nbsp;=&nbsp;0.997).</div>
+    </div>
+
+    <div class="col" id="wbstage" style="padding:0">
+      <canvas id="wbcanvas"></canvas>
+      <div id="wbleg">
+        <div class="lt" id="legtitle">Calcite saturation index</div>
+        <div class="bar" id="legbar"></div>
+        <div class="ticks" id="legticks"></div>
+      </div>
+      <div id="wbhint">drag to rotate &middot; scroll to zoom</div>
+    </div>
+
+    <div class="col" id="wbpanel">
+      <div class="ph">Colour wellbore by</div>
+      <div class="seg" id="modeseg">
+        <button data-m="si" class="on">Saturation index</button>
+        <button data-m="rate">Scale risk</button>
+      </div>
+      <div class="ph">Readouts</div>
+      <div class="verdict" id="verdict"><span class="ico"></span><span id="verdicttxt"></span></div>
+      <div class="reads" id="reads"></div>
+      <div class="ph">Depth profile</div>
+      <canvas id="wbplot" width="280" height="300"></canvas>
+    </div>
+  </div>
+
+  <div id="wbfoot">
+    <span>Thermodynamics: Plummer&ndash;Busenberg (1982) &middot; Pitzer/HMW84 &middot; Kinetics: Plummer&ndash;Wigley&ndash;Parkhurst (1978)</span>
+    <span>Interactive thesis demonstrator</span>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+  // ================= physics (mirrors validated Python engine; Davies activities) =================
+  var PSI_BAR=0.0689476, R=83.14, N=90;
+  var log10=function(x){return Math.log(x)/Math.LN10;};
+  function logK1(T){return -356.3094-0.06091964*T+21834.37/T+126.8339*log10(T)-1684915.0/(T*T);}
+  function logK2(T){return -107.8871-0.03252849*T+5151.79/T+38.92561*log10(T)-563713.9/(T*T);}
+  function logKspCal(T){return -171.9065-0.077993*T+2839.319/T+71.595*log10(T);}
+  function presFactor(Pbar,T){var dV=-58,dK=-8e-3,dP=Pbar-1;return -(dV/(R*T))*dP+(dK/(2*R*T))*dP*dP;}
+  function gamma(z,I){var s=Math.sqrt(I);return Math.pow(10,-0.51*z*z*(s/(1+s)-0.3*I));}
+  function profile(p){
+    var d=[],SI=[],RATE=[];
+    var g=(p.BHP-p.WHP)/p.TVD, G=(p.BHT-p.WHT)/p.TVD;
+    var mCa=p.Ca/1000/40.078, mHCO3=p.HCO3/1000/61.017;
+    var gCa=gamma(2,p.I), gHCO3=gamma(1,p.I);
+    for(var i=0;i<N;i++){
+      var dd=p.TVD*i/(N-1), Ppsi=p.WHP+g*dd, Tc=p.WHT+G*dd, Tk=Tc+273.15, Pbar=Ppsi*PSI_BAR;
+      var ph=p.pH+p.adeg*log10(p.BHP/Ppsi), aH=Math.pow(10,-ph), aHCO3=gHCO3*mHCO3;
+      var aCO3=Math.pow(10,logK2(Tk))*aHCO3/aH, IAP=gCa*mCa*aCO3;
+      var si=log10(IAP)-(logKspCal(Tk)+presFactor(Pbar,Tk)/Math.LN10);
+      var k1=Math.pow(10,0.198-444/Tk),k2=Math.pow(10,2.84-2177/Tk),
+          k3=Tc>25?Math.pow(10,-1.1-1737/Tk):Math.pow(10,-5.86-317/Tk);
+      var aCO2=aH*aHCO3/Math.pow(10,logK1(Tk));
+      var rf=k1*aH+k2*aCO2+k3, rate=Math.max(0,-(rf*(1-Math.pow(10,2/3*si))));
+      d.push(dd);SI.push(si);RATE.push(rate);
+    }
+    var rmax=Math.max.apply(null,RATE)||1e-30,simax=-99,sup=0,risk=0,iRisk=0;
+    for(var j=0;j<N;j++){if(SI[j]>simax)simax=SI[j];if(SI[j]>0)sup++;if(RATE[j]>risk){risk=RATE[j];iRisk=j;}}
+    return {d:d,SI:SI,RATE:RATE,rmax:rmax,
+      sum:{simax:simax,siWH:SI[0],siBH:SI[N-1],supfrac:sup/N,peakDepth:d[iRisk]}};
+  }
+  // ================= colour maps =================
+  function mix(a,b,t){return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+  function siColor(si){var st=[[40,90,200],[90,170,230],[235,238,243],[245,158,11],[200,30,46]];
+    var t=Math.max(0,Math.min(1,(si+1)/4))*4,i=Math.min(3,Math.floor(t));return mix(st[i],st[i+1],t-i);}
+  function rateColor(r,rmax){var t=Math.pow(Math.max(0,Math.min(1,r/rmax)),0.7);
+    var st=[[20,40,60],[56,189,248],[245,200,80],[200,40,46]];var u=t*3,i=Math.min(2,Math.floor(u));return mix(st[i],st[i+1],u-i);}
+  function css(c){return 'rgb('+(c[0]|0)+','+(c[1]|0)+','+(c[2]|0)+')';}
+
+  // ================= three.js scene =================
+  var cv=document.getElementById('wbcanvas');
+  var stage=document.getElementById('wbstage');
+  var W=Math.max(360,stage.clientWidth||640),H=560;
+  var renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));renderer.setSize(W,H,false);
+  var scene=new THREE.Scene();scene.fog=new THREE.Fog(0x0b1322,12,26);
+  var cam=new THREE.PerspectiveCamera(40,W/H,0.1,1000);cam.position.set(4.6,2.2,11.4);
+  var controls=new THREE.OrbitControls(cam,renderer.domElement);
+  controls.enableDamping=true;controls.dampingFactor=.08;controls.enablePan=false;
+  controls.minDistance=6;controls.maxDistance=22;controls.target.set(0,-.35,0);controls.autoRotate=false;
+  scene.add(new THREE.AmbientLight(0xffffff,.55));
+  var key=new THREE.DirectionalLight(0xffffff,.8);key.position.set(5,8,6);scene.add(key);
+  var fill=new THREE.DirectionalLight(0x88bbff,.35);fill.position.set(-6,2,-4);scene.add(fill);
+  var rim=new THREE.DirectionalLight(0x2dd4bf,.4);rim.position.set(0,-4,-6);scene.add(rim);
+
+  var TUBE_H=5.4, RIN=0.52, RWALL=0.6;
+  // ground grid
+  var grid=new THREE.GridHelper(16,32,0x223049,0x16202f);grid.position.y=-TUBE_H/2-0.55;scene.add(grid);
+  // wellhead structure (christmas-tree-ish)
+  var head=new THREE.Group();head.position.y=TUBE_H/2;
+  var steel=new THREE.MeshStandardMaterial({color:0x3a4a63,metalness:.6,roughness:.4});
+  var flange=new THREE.Mesh(new THREE.CylinderGeometry(.82,.82,.22,28),steel);flange.position.y=.11;head.add(flange);
+  var spool=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.5,24),steel);spool.position.y=.46;head.add(spool);
+  var cap=new THREE.Mesh(new THREE.BoxGeometry(.5,.32,.5),steel);cap.position.y=.86;head.add(cap);
+  var valve=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.7,16),steel);valve.rotation.z=Math.PI/2;valve.position.set(.6,.46,0);head.add(valve);
+  scene.add(head);
+
+  // pipe wall (translucent, coloured by SI/rate)
+  var texCanvas=document.createElement('canvas');texCanvas.width=8;texCanvas.height=256;var tex=null;
+  var pipeMat=new THREE.MeshStandardMaterial({transparent:true,opacity:.5,depthWrite:false,
+    side:THREE.DoubleSide,roughness:.35,metalness:.1});
+  var pipe=new THREE.Mesh(new THREE.CylinderGeometry(RWALL,RWALL,TUBE_H,48,1,true),pipeMat);scene.add(pipe);
+  // flow core
+  var core=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,TUBE_H,20),
+    new THREE.MeshStandardMaterial({color:0x0a1622,roughness:1}));scene.add(core);
+  // scale deposit (Lathe rebuilt from rate profile)
+  var depMat=new THREE.MeshStandardMaterial({color:0xe8e2d2,roughness:1,metalness:.02,side:THREE.DoubleSide});
+  var deposit=new THREE.Mesh(new THREE.BufferGeometry(),depMat);scene.add(deposit);
+
+  function sprite(text,size){
+    var c=document.createElement('canvas');c.width=256;c.height=64;var x=c.getContext('2d');
+    x.fillStyle='#9fb1c8';x.font='600 '+(size||30)+'px Inter, sans-serif';x.textAlign='left';
+    x.textBaseline='middle';x.fillText(text,6,34);
+    var t=new THREE.CanvasTexture(c);var s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false}));
+    s.scale.set(2.4,.6,1);return s;
+  }
+  // depth ticks
+  var tickGroup=new THREE.Group();scene.add(tickGroup);
+  function buildTicks(TVD){
+    while(tickGroup.children.length)tickGroup.remove(tickGroup.children[0]);
+    for(var f=0;f<=1.0001;f+=0.25){
+      var y=TUBE_H/2 - f*TUBE_H;
+      var depth=Math.round(f*TVD);
+      var lbl=sprite((f===0?'wellhead  ':'')+depth.toLocaleString()+' ft',26);
+      lbl.position.set(RWALL+1.35,y,0);tickGroup.add(lbl);
+      var g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(RWALL,y,0),new THREE.Vector3(RWALL+.28,y,0)]);
+      tickGroup.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0x3a4a63})));
+    }
+  }
+
+  function updateScene(prof,mode){
+    // pipe texture
+    var ctx=texCanvas.getContext('2d');
+    for(var y=0;y<256;y++){var idx=Math.round((N-1)*(y/255));
+      var c=mode==='si'?siColor(prof.SI[idx]):rateColor(prof.RATE[idx],prof.rmax);
+      ctx.fillStyle=css(c);ctx.fillRect(0,y,8,1);}
+    if(tex)tex.dispose();tex=new THREE.CanvasTexture(texCanvas);pipeMat.map=tex;pipeMat.needsUpdate=true;
+    // deposit lathe: inner radius narrows where deposition rate is high (i=0 wellhead at top)
+    var pts=[];
+    for(var i=0;i<N;i++){var y=TUBE_H/2 - (i/(N-1))*TUBE_H;
+      var t=Math.pow(prof.RATE[i]/prof.rmax,0.7);var rr=RIN - (RIN-0.12)*t;
+      pts.push(new THREE.Vector2(Math.max(0.1,rr),y));}
+    var lathe=new THREE.LatheGeometry(pts,48);deposit.geometry.dispose();deposit.geometry=lathe;
+  }
+
+  // ================= 2D depth profile =================
+  var plot=document.getElementById('wbplot'),px=plot.getContext('2d');
+  function fitPlot(){var w=plot.clientWidth||280;plot.width=w;plot.height=300;}
+  function draw2D(prof,TVD){
+    fitPlot();var w=plot.width,h=plot.height,L=34,Rr=12,T=14,B=24,pw=w-L-Rr,ph=h-T-B;
+    px.clearRect(0,0,w,h);
+    var siMin=-1,siMax=Math.max(3,prof.sum.simax+.3);
+    function X(si){return L+pw*(si-siMin)/(siMax-siMin);}
+    function Y(i){return T+ph*(i/(N-1));}
+    px.strokeStyle='#1b2438';px.lineWidth=1;
+    for(var f=0;f<=1;f+=.25){var yy=T+ph*f;px.beginPath();px.moveTo(L,yy);px.lineTo(L+pw,yy);px.stroke();
+      px.fillStyle='#5f6f86';px.font='10px Inter,sans-serif';px.textAlign='right';
+      px.fillText(Math.round(f*TVD/1000)+'k',L-5,yy+3);}
+    px.strokeStyle='#33405a';px.setLineDash([3,3]);px.beginPath();px.moveTo(X(0),T);px.lineTo(X(0),T+ph);px.stroke();px.setLineDash([]);
+    // rate curve
+    px.strokeStyle='#f0556b';px.lineWidth=2;px.beginPath();
+    for(var i=0;i<N;i++){var xr=L+pw*(prof.RATE[i]/prof.rmax);(i?px.lineTo:px.moveTo).call(px,xr,Y(i));}px.stroke();
+    // SI curve
+    px.strokeStyle='#38bdf8';px.lineWidth=2.2;px.beginPath();
+    for(var j=0;j<N;j++)(j?px.lineTo:px.moveTo).call(px,X(prof.SI[j]),Y(j));px.stroke();
+    px.fillStyle='#8ea0b6';px.font='10px Inter,sans-serif';px.textAlign='left';
+    px.fillText('SI',X(prof.sum.simax)-6,T+ph-4);px.fillStyle='#f0556b';px.fillText('rate',L+pw*0.5,T+10);
+    px.fillStyle='#5f6f86';px.textAlign='left';px.fillText('depth (ft)',2,h-6);
+  }
+
+  // ================= readouts =================
+  function readouts(s){
+    var rows=[['Max calcite SI',s.simax.toFixed(2),''],['Supersaturated','',(s.supfrac*100).toFixed(0),'%'],
+      ['SI at wellhead',s.siWH.toFixed(2),''],['SI at bottomhole',s.siBH.toFixed(2),'']];
+    document.getElementById('reads').innerHTML=rows.map(function(r){
+      var val=r[2]!==''&&r[2]!==undefined?r[1]+r[2]:r[1];
+      return '<div class="rc"><div class="k">'+r[0]+'</div><div class="val">'+(r[3]?(r[2]||''):r[1])+
+        (r[3]?'<small>'+r[3]+'</small>':'')+'</div></div>';}).join('');
+    var sev,col,txt;
+    if(s.simax<=0){sev='Undersaturated';col='#8ea0b6';txt='dissolving — no scale expected';}
+    else if(s.simax<1){sev='Low risk';col='#34d399';txt='mild scaling tendency';}
+    else if(s.simax<2){sev='Elevated risk';col='#fbbf24';txt='significant scaling tendency';}
+    else {sev='High risk';col='#f0556b';txt='strong scaling tendency';}
+    var v=document.getElementById('verdict');v.style.borderColor=col;v.style.background=col+'1a';
+    v.querySelector('.ico').style.background=col;
+    document.getElementById('verdicttxt').innerHTML='<span style="color:'+col+'">'+sev+'</span> &middot; '+txt;
+  }
+
+  // ================= controls =================
+  var CHEM=[['Ca','Ca²⁺','ppm',100,20000,5000,1],['HCO3','HCO₃⁻','ppm',40,1000,200,1],
+    ['pH','pH (bottomhole)','',5,7.5,6.5,0.05],['I','ionic strength','mol/kg',0.1,6,2.0,0.1]];
+  var WELL=[['BHT','bottomhole temp','°C',50,140,85,1],['BHP','bottomhole pressure','psi',1500,8000,4500,50],
+    ['TVD','true vertical depth','ft',4000,14000,9000,100],['adeg','CO₂ degassing','',0,1,0.5,0.05]];
+  var P={WHP:500,WHT:40},mode='si';
+  function buildSliders(spec,host){
+    spec.forEach(function(s){P[s[0]]=s[5];
+      var d=document.createElement('div');d.className='ctl';
+      d.innerHTML='<div class="row"><span>'+s[1]+(s[2]?' <span style="color:#5f6f86">('+s[2]+')</span>':'')+
+        '</span><span class="v" id="v_'+s[0]+'"></span></div>'+
+        '<input type="range" id="s_'+s[0]+'" min="'+s[3]+'" max="'+s[4]+'" step="'+s[6]+'" value="'+s[5]+'">';
+      host.appendChild(d);
+      var inp=d.querySelector('input'),lab=d.querySelector('.v');
+      function fmt(x){return s[6]<1?x.toFixed(2):x.toLocaleString();}
+      lab.textContent=fmt(s[5]);
+      inp.addEventListener('input',function(e){P[s[0]]=parseFloat(e.target.value);lab.textContent=fmt(P[s[0]]);recompute();});
+    });
+  }
+  buildSliders(CHEM,document.getElementById('grp-chem'));
+  buildSliders(WELL,document.getElementById('grp-well'));
+  Array.prototype.forEach.call(document.querySelectorAll('#modeseg button'),function(b){
+    b.addEventListener('click',function(){mode=b.getAttribute('data-m');
+      document.querySelectorAll('#modeseg button').forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on');recompute();});});
+
+  function legend(prof){
+    var bar=document.getElementById('legbar'),ti=document.getElementById('legticks');
+    if(mode==='si'){document.getElementById('legtitle').textContent='Calcite saturation index';
+      bar.style.background='linear-gradient(90deg,'+css(siColor(-1))+','+css(siColor(0))+','+css(siColor(1))+','+css(siColor(2))+','+css(siColor(3))+')';
+      ti.innerHTML='<span>-1</span><span>0</span><span>+1</span><span>+2</span><span>+3</span>';
+    }else{document.getElementById('legtitle').textContent='Relative deposition rate';
+      bar.style.background='linear-gradient(90deg,'+css(rateColor(0,1))+','+css(rateColor(.5,1))+','+css(rateColor(1,1))+')';
+      ti.innerHTML='<span>low</span><span>med</span><span>high</span>';}
+  }
+  var lastTVD=0;
+  function recompute(){var prof=profile(P);if(P.TVD!==lastTVD){buildTicks(P.TVD);lastTVD=P.TVD;}
+    updateScene(prof,mode);draw2D(prof,P.TVD);readouts(prof.sum);legend(prof);}
+  recompute();
+
+  function resize(){W=Math.max(120,stage.clientWidth||640);H=stage.clientHeight||560;
+    renderer.setSize(W,H,false);cam.aspect=W/H;cam.updateProjectionMatrix();}
+  window.addEventListener('resize',function(){resize();var pr=profile(P);draw2D(pr,P.TVD);});
+  if(window.ResizeObserver)new ResizeObserver(resize).observe(stage);
+  requestAnimationFrame(function(){resize();requestAnimationFrame(resize);});
+  (function loop(){requestAnimationFrame(loop);controls.update();renderer.render(scene,cam);})();
+})();
+</script>
+</body>
+</html>
