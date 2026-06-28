@@ -19,9 +19,11 @@ equation in the draft):
 """
 import sys
 import numpy as np
+import pandas as pd
 sys.path.insert(0, ".")
 from physics import constants as C
 from physics import pressure as PR
+from physics import kinetics as KIN
 from physics.pitzer import activity_coefficients
 
 PSI_TO_BAR = 0.0689476
@@ -37,6 +39,24 @@ REF = dict(
     n_depth=60,         # depth discretisation points
     si_threshold=0.5,   # "high-risk" SI cutoff for zone length
 )
+
+# Per-well downhole-condition columns that, when present in a sample row, override
+# REF so the simulation uses REAL measured conditions instead of one shared geometry.
+PER_WELL_KEYS = ["TVD_ft", "WHP_psi", "BHP_psi", "WHT_C", "BHT_C"]
+
+
+def config_from_row(row, base=REF):
+    """Build a wellbore config from per-well columns when present, else fall back to REF.
+
+    This is the hook for real per-well downhole data: supply any of TVD_ft, WHP_psi,
+    BHP_psi, WHT_C, BHT_C per well and SI/kinetics stop being a single shared transform
+    of surface chemistry — which is the only way physics can carry orthogonal signal.
+    """
+    cfg = dict(base)
+    for k in PER_WELL_KEYS:
+        if k in row and pd.notna(row[k]):
+            cfg[k] = float(row[k])
+    return cfg
 
 
 def molalities(sample):
@@ -98,7 +118,17 @@ def simulate(sample, cfg=None):
         SI_cal[i] = np.log10(IAP) - logKc
         SI_arag[i] = np.log10(IAP) - logKa
 
-    return _summarise(d, T_C, P_psi, pH, SI_cal, SI_arag, TVD, cfg["si_threshold"])
+    # --- kinetic deposition-rate profile (PWP) along the well -----------------
+    # reuse the depth-resolved activities; a(CO2) from carbonate speciation.
+    a_H = 10.0 ** (-pH)
+    a_HCO3 = gHCO3_d * m_HCO3
+    a_CO2 = KIN.co2_activity(a_H, a_HCO3, T_K)
+    dep = KIN.deposition_rate(SI_cal, a_H, a_CO2, a_H2O=1.0, T_K=T_K)
+
+    res = _summarise(d, T_C, P_psi, pH, SI_cal, SI_arag, TVD, cfg["si_threshold"])
+    res.update(_summarise_kinetics(d, dep))
+    res["dep_profile"] = dep
+    return res
 
 
 def _summarise(d, T_C, P_psi, pH, SI_cal, SI_arag, TVD, thr):
@@ -124,16 +154,38 @@ def _summarise(d, T_C, P_psi, pH, SI_cal, SI_arag, TVD, thr):
     }
 
 
-def simulate_dataframe(df, cfg=None):
-    """Run the simulator over every row; return df with appended physics features."""
+def _summarise_kinetics(d, dep):
+    """Summarise the depth-resolved PWP deposition rate into ML features.
+
+    krate_integral is the depth-integrated rate (proportional to total scale
+    deposited per unit area along the well) — the kinetic analogue of SI_max.
+    """
+    return {
+        "krate_max": float(dep.max()),
+        "krate_mean": float(dep.mean()),
+        "krate_integral": float(np.trapezoid(dep, d)),
+        "krate_peak_depth_ft": float(d[int(np.argmax(dep))]),
+    }
+
+
+def simulate_dataframe(df, cfg=None, per_well=False):
+    """Run the simulator over every row; return df with appended physics features.
+
+    per_well=True builds each row's config from its per-well columns (PER_WELL_KEYS)
+    via config_from_row, falling back to REF for any missing value. This is how real
+    measured downhole conditions enter the model. per_well=False keeps the original
+    behaviour (one shared cfg/REF for all rows).
+    """
     feats = ["SI_max_cal", "SI_mean_cal", "SI_max_arag",
-             "onset_depth_ft", "supersat_fraction", "highrisk_zone_ft"]
+             "onset_depth_ft", "supersat_fraction", "highrisk_zone_ft",
+             "krate_max", "krate_mean", "krate_integral", "krate_peak_depth_ft"]
     rows = []
     for _, s in df.iterrows():
-        r = simulate(s, cfg)
+        row_cfg = config_from_row(s) if per_well else cfg
+        r = simulate(s, row_cfg)
         rows.append({f: r[f] for f in feats})
     out = df.copy().reset_index(drop=True)
-    fdf = __import__("pandas").DataFrame(rows)
+    fdf = pd.DataFrame(rows)
     for c in feats:
         out[c] = fdf[c].values
     return out

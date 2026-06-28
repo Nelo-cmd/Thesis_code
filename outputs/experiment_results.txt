@@ -1,0 +1,44 @@
+==============================================================================
+THE PHYSICS-VALUE EXPERIMENT (rigorous, confound-aware) — AUC mean +/- std
+  trivial baseline AUC = 0.500. Pooled/cross-field are FIELD-CONFOUNDED;
+  the decisive test is WITHIN FIELD B (balanced, no field-identity signal).
+==============================================================================
+
+--- regime: POOLED (CONFOUNDED by field)  (n=505, folds=50, base rate=0.703) ---
+model                chemistry             +SI       +kinetics
+LogReg             0.736+/-0.0     0.734+/-0.0     0.730+/-0.0
+RandomForest       0.814+/-0.0     0.810+/-0.0     0.807+/-0.0
+XGBoost            0.809+/-0.0     0.809+/-0.0     0.809+/-0.0
+  marginal AUC (paired): mean dAUC [%folds improved] p
+    LogReg        SI-vs-chem -0.0014[ 42%]p=0.05   kin-vs-SI -0.0041[ 34%]p=0.00
+    RandomForest  SI-vs-chem -0.0037[ 34%]p=0.01   kin-vs-SI -0.0032[ 34%]p=0.01
+    XGBoost       SI-vs-chem +0.0001[ 46%]p=0.98   kin-vs-SI +0.0004[ 52%]p=0.79
+
+--- regime: GROUPED by well (leakage-free, still field-confounded)  (n=505, folds=50, base rate=0.703) ---
+model                chemistry             +SI       +kinetics
+LogReg             0.722+/-0.1     0.719+/-0.1     0.714+/-0.1
+RandomForest       0.717+/-0.0     0.711+/-0.1     0.707+/-0.1
+XGBoost            0.708+/-0.0     0.709+/-0.0     0.706+/-0.0
+  marginal AUC (paired): mean dAUC [%folds improved] p
+    LogReg        SI-vs-chem -0.0027[ 42%]p=0.05   kin-vs-SI -0.0050[ 42%]p=0.00
+    RandomForest  SI-vs-chem -0.0068[ 32%]p=0.00   kin-vs-SI -0.0033[ 38%]p=0.10
+    XGBoost       SI-vs-chem +0.0011[ 62%]p=0.65   kin-vs-SI -0.0023[ 36%]p=0.28
+
+--- regime: WITHIN FIELD B, grouped  <-- DECISIVE (no field confound)  (n=277, folds=50, base rate=0.477) ---
+model                chemistry             +SI       +kinetics
+LogReg             0.671+/-0.1     0.669+/-0.1     0.666+/-0.1
+RandomForest       0.629+/-0.1     0.633+/-0.1     0.628+/-0.1
+XGBoost            0.618+/-0.0     0.628+/-0.0     0.626+/-0.0
+  marginal AUC (paired): mean dAUC [%folds improved] p
+    LogReg        SI-vs-chem -0.0015[ 42%]p=0.24   kin-vs-SI -0.0037[ 44%]p=0.03
+    RandomForest  SI-vs-chem +0.0043[ 58%]p=0.12   kin-vs-SI -0.0050[ 36%]p=0.03
+    XGBoost       SI-vs-chem +0.0102[ 60%]p=0.01   kin-vs-SI -0.0017[ 44%]p=0.59
+
+==============================================================================
+FIELD-CONFOUND DIAGNOSTIC — how much of 'chemistry' is just guessing the field?
+==============================================================================
+  pooled XGB AUC  chemistry            = 0.809
+  pooled XGB AUC  chemistry + Field    = 0.897   (jump = +0.088)
+  corr(Ca_TDS_norm, label) in Field A = +0.112   (field positive rate 0.98)
+  corr(Ca_TDS_norm, label) in Field B = -0.262   (field positive rate 0.48)
+  -> sign flip across fields = Simpson's paradox; pooled AUC rewards field identity.
